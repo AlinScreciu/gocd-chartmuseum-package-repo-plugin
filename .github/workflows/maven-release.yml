@@ -30,17 +30,17 @@ jobs:
       id: version
       shell: bash
     - name: Calculate MD5
-      run: echo "::set-output name=md5sum::$(md5sum -b target/go-maven-poller-plugin.jar | cut -f1 -d" ")"
+      run: echo "::set-output name=md5sum::$(md5sum -b target/chartmuseum.material.poller.jar | cut -f1 -d" ")"
       id: md5sum
       shell: bash
     - name: Calculate SHA256
-      run: echo "::set-output name=sha256sum::$(sha256sum -b target/go-maven-poller-plugin.jar | cut -f1 -d" ")"
+      run: echo "::set-output name=sha256sum::$(sha256sum -b target/chartmuseum.material.poller.jar | cut -f1 -d" ")"
       id: sha256sum
       shell: bash
     - uses: actions/upload-artifact@v3
       with:
-        name: chartmuseum.material.poller.jar.jar
-        path: target/chartmuseum.material.poller.jar.jar
+        name: chartmuseum.material.poller.jar
+        path: target/chartmuseum.material.poller.jar
     - uses: actions/create-release@v1
       id: create_release
       env:
@@ -68,6 +68,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: target/chartmuseum.material.poller.jar.jar
-        asset_name: chartmuseum.material.poller.jar.jar
+        asset_path: target/chartmuseum.material.poller.jar
+        asset_name: chartmuseum.material.poller.jar
         asset_content_type: application/java-archive
