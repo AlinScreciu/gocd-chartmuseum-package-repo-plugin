@@ -16,20 +16,20 @@ public class ChartmuseumClient {
     private final String url;
     Gson gson;
     
-
-
+    
     public ChartmuseumClient(String url) {
         this.url = url;
         gson = new GsonBuilder().create();
+        
     }
-
+    
     public void checkRepoConnection() {
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url + "/health")).build();
         throwIfStatusNotOk(client, request);
     }
-
+    
     private void throwIfStatusNotOk(HttpClient client, HttpRequest request) {
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -40,32 +40,59 @@ public class ChartmuseumClient {
             throw new RuntimeException(e);
         }
     }
-
-    public void checkChartConnection(String chartName) {
+    
+    public void checkChartConnection(PackageConfig packageConfig) {
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url + "/api/charts/" + chartName)).method("HEAD", HttpRequest.BodyPublishers.noBody()).build();
+                .uri(URI.create(url + "/api/charts/" + packageConfig.getChartName())).method("HEAD", HttpRequest.BodyPublishers.noBody()).build();
         throwIfStatusNotOk(client, request);
     }
-
+    
     public List<Chart> getAllChartVersions(String chartName) throws IOException, InterruptedException {
+        System.out.println("52: " + chartName);
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url + "/api/charts/" + chartName)).build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         String body = response.body();
-        return gson.fromJson(body, new TypeToken<List<Chart>>() {
-        }.getType());
+        
+        return gson.fromJson(body, new TypeToken<List<Chart>>() {}.getType());
     }
-
-    public Chart getLatestRevision(String chartName) {
+    
+    public Chart getLatestRevision(PackageConfig packageConfig) {
         try {
-            List<Chart> charts = getAllChartVersions(chartName);
+            List<Chart> charts = getAllChartVersions(packageConfig.getChartName());
+            if (charts.isEmpty()) {
+                return null;
+            }
             charts.sort((l, r) -> {
                 ComparableVersion comparableVersionL = new ComparableVersion(l.getVersion());
                 ComparableVersion comparableVersionR = new ComparableVersion(r.getVersion());
-                return comparableVersionR.compareTo(comparableVersionL);
+                int result = comparableVersionR.compareTo(comparableVersionL);
+                if (result == 0) {
+                    return r.getVersion().compareTo(l.getVersion());
+                }
+                return result;
             });
+            if (packageConfig.getPollFrom() != null) {
+                charts.removeIf(chart -> {
+                    ComparableVersion current = new ComparableVersion(chart.getVersion());
+                    ComparableVersion from = new ComparableVersion(packageConfig.getPollFrom());
+                    return current.compareTo(from) < 0;
+                });
+                
+            }
+            if (packageConfig.getPollTo() != null) {
+                charts.removeIf(chart -> {
+                    ComparableVersion current = new ComparableVersion(chart.getVersion());
+                    ComparableVersion to = new ComparableVersion(packageConfig.getPollTo());
+                    return current.compareTo(to) > 0;
+                });
+                
+            }
+            if (charts.isEmpty()) {
+                return null;
+            }
             return charts.get(0);
         } catch (IOException | InterruptedException e) {
             return null;

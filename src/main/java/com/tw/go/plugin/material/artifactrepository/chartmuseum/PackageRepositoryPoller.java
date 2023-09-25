@@ -1,12 +1,9 @@
 /*************************GO-LICENSE-START*********************************
  * Copyright 2014 ThoughtWorks, Inc.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,8 +24,8 @@ import java.util.List;
 
 public class PackageRepositoryPoller {
     
-    private final PackageRepositoryConfigurationProvider configurationProvider;
     private static final Logger LOGGER = Logger.getLoggerFor(PackageRepositoryPoller.class);
+    private final PackageRepositoryConfigurationProvider configurationProvider;
     
     public PackageRepositoryPoller(PackageRepositoryConfigurationProvider configurationProvider) {
         this.configurationProvider = configurationProvider;
@@ -52,49 +49,49 @@ public class PackageRepositoryPoller {
     public CheckConnectionResultMessage checkConnectionToPackage(PackageMaterialProperties packageConfiguration, PackageMaterialProperties repositoryConfiguration) {
         configurationProvider.validatePackageConfiguration(packageConfiguration);
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
-        String chartName = packageConfiguration.getProperty(Constants.PACKAGE_NAME).value();
-        LOGGER.info(String.format("Checking existence of chart: '%s' in chartmuseum: '%s'", chartName, url));
+        PackageConfig packageConfig = new PackageConfig(packageConfiguration);
+        LOGGER.info(String.format("Checking existence of chart: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), url));
         ChartmuseumClient chartmuseumClient = new ChartmuseumClient(url);
         try {
-            chartmuseumClient.checkChartConnection(chartName);
-            LOGGER.info(String.format("Found chart: '%s' in chartmuseum: '%s'", chartName, url));
+            chartmuseumClient.checkChartConnection(packageConfig);
+            LOGGER.info(String.format("Found chart: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), url));
             return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.SUCCESS, List.of("success message"));
             
         } catch (Exception e) {
-            LOGGER.info(String.format("Failed to find chart: '%s' in chartmuseum: '%s'", chartName, url));
+            LOGGER.info(String.format("Failed to find chart: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), url));
             return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.FAILURE, List.of("Failed to connect"));
         }
     }
     
     public PackageRevisionMessage getLatestRevision(PackageMaterialProperties packageConfiguration, PackageMaterialProperties repositoryConfiguration) {
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
-        String chart = packageConfiguration.getProperty(Constants.PACKAGE_NAME).value();
+        PackageConfig packageConfig = new PackageConfig(packageConfiguration);
+        LOGGER.info(String.format("Getting latest revision of chart: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), url));
         ChartmuseumClient chartmuseumClient = new ChartmuseumClient(url);
-        LOGGER.info(String.format("Getting latest revision of chart: '%s' in chartmuseum: '%s'", chart, url));
-        Chart latestRevision = chartmuseumClient.getLatestRevision(chart);
+        Chart latestRevision = chartmuseumClient.getLatestRevision(packageConfig);
         if (latestRevision == null) {
-            LOGGER.info(String.format("Didn't find chart: '%s' in chartmuseum: '%s'", chart, url));
+            LOGGER.info(String.format("Didn't find chart: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), url));
             return null;
         }
-        LOGGER.info(String.format("Found revision: '%s' of chart: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), chart, url));
+        LOGGER.info(String.format("Found revision: '%s' of chart: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), packageConfig.getChartName(), url));
         
-        return getPackageRevisionMessage(url, chart, latestRevision);
+        return getPackageRevisionMessage(url, packageConfig.getChartName(), latestRevision);
     }
     
     public PackageRevisionMessage getLatestRevisionSince(PackageMaterialProperties packageConfiguration, PackageMaterialProperties repositoryConfiguration, PackageRevisionMessage previousPackageRevision) {
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
-        String chart = packageConfiguration.getProperty(Constants.PACKAGE_NAME).value();
+        PackageConfig packageConfig = new PackageConfig(packageConfiguration);
         ChartmuseumClient chartmuseumClient = new ChartmuseumClient(url);
-        LOGGER.info(String.format("Getting latest revision of chart: '%s' since: '%s' in chartmuseum: '%s'", chart, previousPackageRevision.getRevision(), url));
-        Chart latestRevision = chartmuseumClient.getLatestRevision(chart);
+        LOGGER.info(String.format("Getting latest revision of chart: '%s' since: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), previousPackageRevision.getRevision(), url));
+        Chart latestRevision = chartmuseumClient.getLatestRevision(packageConfig);
         String previousRevision = previousPackageRevision.getRevision();
         int compare = new ComparableVersion(latestRevision.getVersion()).compareTo(new ComparableVersion(previousRevision));
         if (compare > 0) {
-            LOGGER.info(String.format("Found new revision: '%s' of chart: '%s' since: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), chart, previousPackageRevision.getRevision(), url));
-            return getPackageRevisionMessage(url, chart, latestRevision);
+            LOGGER.info(String.format("Found new revision: '%s' of chart: '%s' since: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), packageConfig.getChartName(), previousPackageRevision.getRevision(), url));
+            return getPackageRevisionMessage(url, packageConfig.getChartName(), latestRevision);
         }
         
-        LOGGER.info(String.format("Didnt find new revision of chart: '%s' since: '%s' in chartmuseum: '%s'", chart, previousPackageRevision.getRevision(), url));
+        LOGGER.info(String.format("Didnt find new revision of chart: '%s' since: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), previousPackageRevision.getRevision(), url));
         return null;
         
     }
