@@ -13,7 +13,7 @@ import java.net.http.HttpResponse;
 import java.util.List;
 
 public class ChartmuseumClient {
-    private String url;
+    private final String url;
     Gson gson;
     
 
@@ -62,8 +62,8 @@ public class ChartmuseumClient {
         try {
             List<Chart> charts = getAllChartVersions(chartName);
             charts.sort((l, r) -> {
-                ComparableVersion comparableVersionL = new ComparableVersion(l.getAppVersion());
-                ComparableVersion comparableVersionR = new ComparableVersion(r.getAppVersion());
+                ComparableVersion comparableVersionL = new ComparableVersion(l.getVersion());
+                ComparableVersion comparableVersionR = new ComparableVersion(r.getVersion());
                 return comparableVersionR.compareTo(comparableVersionL);
             });
             return charts.get(0);

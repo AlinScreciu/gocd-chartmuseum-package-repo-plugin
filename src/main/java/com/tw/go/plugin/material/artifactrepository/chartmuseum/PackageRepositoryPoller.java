@@ -76,7 +76,7 @@ public class PackageRepositoryPoller {
             LOGGER.info(String.format("Didn't find chart: '%s' in chartmuseum: '%s'", chart, url));
             return null;
         }
-        LOGGER.info(String.format("Found revision: '%s' of chart: '%s' in chartmuseum: '%s'", latestRevision.getAppVersion(), chart, url));
+        LOGGER.info(String.format("Found revision: '%s' of chart: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), chart, url));
         
         return getPackageRevisionMessage(url, chart, latestRevision);
     }
@@ -88,9 +88,9 @@ public class PackageRepositoryPoller {
         LOGGER.info(String.format("Getting latest revision of chart: '%s' since: '%s' in chartmuseum: '%s'", chart, previousPackageRevision.getRevision(), url));
         Chart latestRevision = chartmuseumClient.getLatestRevision(chart);
         String previousRevision = previousPackageRevision.getRevision();
-        int compare = new ComparableVersion(latestRevision.getAppVersion()).compareTo(new ComparableVersion(previousRevision));
+        int compare = new ComparableVersion(latestRevision.getVersion()).compareTo(new ComparableVersion(previousRevision));
         if (compare > 0) {
-            LOGGER.info(String.format("Found new revision: '%s' of chart: '%s' since: '%s' in chartmuseum: '%s'", latestRevision.getAppVersion(), chart, previousPackageRevision.getRevision(), url));
+            LOGGER.info(String.format("Found new revision: '%s' of chart: '%s' since: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), chart, previousPackageRevision.getRevision(), url));
             return getPackageRevisionMessage(url, chart, latestRevision);
         }
         
@@ -101,9 +101,9 @@ public class PackageRepositoryPoller {
     
     @NotNull
     private PackageRevisionMessage getPackageRevisionMessage(String url, String chart, Chart latestRevision) {
-        PackageRevisionMessage packageRevisionMessage = new PackageRevisionMessage(latestRevision.getAppVersion(), latestRevision.getCreated(), "chartmuseum", latestRevision.getDescription(), url + "/api/" + latestRevision.getUrls().get(0));
-        packageRevisionMessage.addData("VERSION", latestRevision.getAppVersion());
-        packageRevisionMessage.addData("LOCATION", url + "/charts/" + chart + "-" + latestRevision.getAppVersion() + ".tgz");
+        PackageRevisionMessage packageRevisionMessage = new PackageRevisionMessage(latestRevision.getVersion(), latestRevision.getCreated(), "chartmuseum", latestRevision.getDescription(), url + "/api/" + latestRevision.getUrls().get(0));
+        packageRevisionMessage.addData("VERSION", latestRevision.getVersion());
+        packageRevisionMessage.addData("LOCATION", url + "/charts/" + chart + "-" + latestRevision.getVersion() + ".tgz");
         return packageRevisionMessage;
     }
 }
