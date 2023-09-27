@@ -23,14 +23,14 @@ import java.io.IOException;
 import java.util.List;
 
 public class PackageRepositoryPoller {
-    
+
     private static final Logger LOGGER = Logger.getLoggerFor(PackageRepositoryPoller.class);
     private final PackageRepositoryConfigurationProvider configurationProvider;
-    
+
     public PackageRepositoryPoller(PackageRepositoryConfigurationProvider configurationProvider) {
         this.configurationProvider = configurationProvider;
     }
-    
+
     public CheckConnectionResultMessage checkConnectionToRepository(PackageMaterialProperties repositoryConfiguration) throws IOException {
         configurationProvider.validateRepositoryConfiguration(repositoryConfiguration);
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
@@ -45,7 +45,7 @@ public class PackageRepositoryPoller {
             return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.FAILURE, List.of("Failed to connect"));
         }
     }
-    
+
     public CheckConnectionResultMessage checkConnectionToPackage(PackageMaterialProperties packageConfiguration, PackageMaterialProperties repositoryConfiguration) {
         configurationProvider.validatePackageConfiguration(packageConfiguration);
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
@@ -56,13 +56,13 @@ public class PackageRepositoryPoller {
             chartmuseumClient.checkChartConnection(packageConfig);
             LOGGER.info(String.format("Found chart: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), url));
             return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.SUCCESS, List.of("success message"));
-            
+
         } catch (Exception e) {
             LOGGER.info(String.format("Failed to find chart: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), url));
             return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.FAILURE, List.of("Failed to connect"));
         }
     }
-    
+
     public PackageRevisionMessage getLatestRevision(PackageMaterialProperties packageConfiguration, PackageMaterialProperties repositoryConfiguration) {
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
         PackageConfig packageConfig = new PackageConfig(packageConfiguration);
@@ -74,10 +74,10 @@ public class PackageRepositoryPoller {
             return null;
         }
         LOGGER.info(String.format("Found revision: '%s' of chart: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), packageConfig.getChartName(), url));
-        
+
         return getPackageRevisionMessage(url, packageConfig.getChartName(), latestRevision);
     }
-    
+
     public PackageRevisionMessage getLatestRevisionSince(PackageMaterialProperties packageConfiguration, PackageMaterialProperties repositoryConfiguration, PackageRevisionMessage previousPackageRevision) {
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
         PackageConfig packageConfig = new PackageConfig(packageConfiguration);
@@ -90,12 +90,12 @@ public class PackageRepositoryPoller {
             LOGGER.info(String.format("Found new revision: '%s' of chart: '%s' since: '%s' in chartmuseum: '%s'", latestRevision.getVersion(), packageConfig.getChartName(), previousPackageRevision.getRevision(), url));
             return getPackageRevisionMessage(url, packageConfig.getChartName(), latestRevision);
         }
-        
+
         LOGGER.info(String.format("Didnt find new revision of chart: '%s' since: '%s' in chartmuseum: '%s'", packageConfig.getChartName(), previousPackageRevision.getRevision(), url));
         return null;
-        
+
     }
-    
+
     @NotNull
     private PackageRevisionMessage getPackageRevisionMessage(String url, String chart, Chart latestRevision) {
         PackageRevisionMessage packageRevisionMessage = new PackageRevisionMessage(latestRevision.getVersion(), latestRevision.getCreated(), "chartmuseum", latestRevision.getDescription(), url + "/api/" + latestRevision.getUrls().get(0));

@@ -32,7 +32,7 @@ import static com.tw.go.plugin.material.artifactrepository.chartmuseum.JsonUtil.
 
 @Extension
 public class PackageRepositoryMaterial extends AbstractGoPlugin {
-    
+
     public static final String EXTENSION = "package-repository";
     public static final String REQUEST_REPOSITORY_CONFIGURATION = "repository-configuration";
     public static final String REQUEST_PACKAGE_CONFIGURATION = "package-configuration";
@@ -46,7 +46,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
     private final Map<String, MessageHandler> handlerMap = new LinkedHashMap<String, MessageHandler>();
     private final PackageRepositoryConfigurationProvider configurationProvider;
     private final PackageRepositoryPoller packageRepositoryPoller;
-    
+
     public PackageRepositoryMaterial() {
         configurationProvider = new PackageRepositoryConfigurationProvider();
         packageRepositoryPoller = new PackageRepositoryPoller(configurationProvider);
@@ -59,8 +59,8 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
         handlerMap.put(REQUEST_LATEST_PACKAGE_REVISION, latestRevisionMessageHandler());
         handlerMap.put(REQUEST_LATEST_PACKAGE_REVISION_SINCE, latestRevisionSinceMessageHandler());
     }
-    
-    
+
+
     @Override
     public GoPluginApiResponse handle(GoPluginApiRequest goPluginApiRequest) {
         try {
@@ -72,24 +72,24 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             return DefaultGoPluginApiResponse.error(e.getMessage());
         }
     }
-    
+
     @Override
     public GoPluginIdentifier pluginIdentifier() {
         return new GoPluginIdentifier(EXTENSION, List.of("1.0"));
     }
-    
+
     MessageHandler packageConfigurationMessageHandler() {
         return request -> success(toJsonString(configurationProvider.packageConfiguration().getPropertyMap()));
-        
+
     }
-    
+
     MessageHandler repositoryConfigurationsMessageHandler() {
         return request -> success(toJsonString(configurationProvider.repositoryConfiguration().getPropertyMap()));
     }
-    
+
     MessageHandler validateRepositoryConfigurationMessageHandler() {
         return request -> {
-            
+
             ValidateRepositoryConfigurationMessage message = fromJsonString(request.requestBody(), ValidateRepositoryConfigurationMessage.class);
             ValidationResultMessage validationResultMessage = configurationProvider.validateRepositoryConfiguration(message.getRepositoryConfiguration());
             if (validationResultMessage.failure()) {
@@ -98,7 +98,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             return success("");
         };
     }
-    
+
     MessageHandler validatePackageConfigurationMessageHandler() {
         return request -> {
             ValidatePackageConfigurationMessage message = fromJsonString(request.requestBody(), ValidatePackageConfigurationMessage.class);
@@ -109,7 +109,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             return success("");
         };
     }
-    
+
     MessageHandler checkRepositoryConnectionMessageHandler() {
         return request -> {
             RepositoryConnectionMessage message = fromJsonString(request.requestBody(), RepositoryConnectionMessage.class);
@@ -122,7 +122,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             return success(toJsonString(result));
         };
     }
-    
+
     MessageHandler checkPackageConnectionMessageHandler() {
         return request -> {
             PackageConnectionMessage message = fromJsonString(request.requestBody(), PackageConnectionMessage.class);
@@ -130,7 +130,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             return success(toJsonString(result));
         };
     }
-    
+
     MessageHandler latestRevisionMessageHandler() {
         return request -> {
             LatestPackageRevisionMessage message = fromJsonString(request.requestBody(), LatestPackageRevisionMessage.class);
@@ -138,7 +138,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             return success(toJsonString(revision));
         };
     }
-    
+
     MessageHandler latestRevisionSinceMessageHandler() {
         return request -> {
             LatestPackageRevisionSinceMessage message = fromJsonString(request.requestBody(), LatestPackageRevisionSinceMessage.class);
@@ -146,5 +146,5 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             return success(revision == null ? null : toJsonString(revision));
         };
     }
-    
+
 }

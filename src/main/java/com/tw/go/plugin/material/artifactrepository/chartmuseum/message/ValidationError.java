@@ -17,41 +17,41 @@ import com.google.gson.annotations.Expose;
 import java.util.Objects;
 
 public class ValidationError {
-    
+
     @Expose
     private String key;
-    
+
     @Expose
     private String message;
-    
+
     public ValidationError(String key, String message) {
         this.key = key;
         this.message = message;
     }
-    
+
     public static ValidationError create(String message) {
         return new ValidationError("", message);
     }
-    
+
     public static ValidationError create(String key, String message) {
         return new ValidationError(key, message);
     }
-    
+
     public String getMessage() {
         return message;
     }
-    
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        
+
         ValidationError that = (ValidationError) o;
-        
+
         if (!Objects.equals(key, that.key)) return false;
         return Objects.equals(message, that.message);
     }
-    
+
     @Override
     public int hashCode() {
         int result = key != null ? key.hashCode() : 0;

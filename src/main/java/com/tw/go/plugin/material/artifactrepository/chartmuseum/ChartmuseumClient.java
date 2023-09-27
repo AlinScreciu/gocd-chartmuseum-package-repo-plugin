@@ -15,21 +15,21 @@ import java.util.List;
 public class ChartmuseumClient {
     private final String url;
     Gson gson;
-    
-    
+
+
     public ChartmuseumClient(String url) {
         this.url = url;
         gson = new GsonBuilder().create();
-        
+
     }
-    
+
     public void checkRepoConnection() {
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url + "/health")).build();
         throwIfStatusNotOk(client, request);
     }
-    
+
     private void throwIfStatusNotOk(HttpClient client, HttpRequest request) {
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -40,14 +40,14 @@ public class ChartmuseumClient {
             throw new RuntimeException(e);
         }
     }
-    
+
     public void checkChartConnection(PackageConfig packageConfig) {
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url + "/api/charts/" + packageConfig.getChartName())).method("HEAD", HttpRequest.BodyPublishers.noBody()).build();
         throwIfStatusNotOk(client, request);
     }
-    
+
     public List<Chart> getAllChartVersions(String chartName) throws IOException, InterruptedException {
         System.out.println("52: " + chartName);
         HttpClient client = HttpClient.newHttpClient();
@@ -55,10 +55,11 @@ public class ChartmuseumClient {
                 .uri(URI.create(url + "/api/charts/" + chartName)).build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         String body = response.body();
-        
-        return gson.fromJson(body, new TypeToken<List<Chart>>() {}.getType());
+
+        return gson.fromJson(body, new TypeToken<List<Chart>>() {
+        }.getType());
     }
-    
+
     public Chart getLatestRevision(PackageConfig packageConfig) {
         try {
             List<Chart> charts = getAllChartVersions(packageConfig.getChartName());
@@ -80,7 +81,7 @@ public class ChartmuseumClient {
                     ComparableVersion from = new ComparableVersion(packageConfig.getPollFrom());
                     return current.compareTo(from) < 0;
                 });
-                
+
             }
             if (packageConfig.getPollTo() != null) {
                 charts.removeIf(chart -> {
@@ -88,7 +89,7 @@ public class ChartmuseumClient {
                     ComparableVersion to = new ComparableVersion(packageConfig.getPollTo());
                     return current.compareTo(to) > 0;
                 });
-                
+
             }
             if (charts.isEmpty()) {
                 return null;

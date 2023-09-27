@@ -13,11 +13,11 @@ public class Chart {
     private List<String> urls;
     private Date created;
     private String digest;
-    
+
     public Chart() {
-    
+
     }
-    
+
     public Chart(String name, String version, String description, String apiVersion, String appVersion, List<String> urls, Date created, String digest) {
         this.name = name;
         this.version = version;
@@ -28,11 +28,11 @@ public class Chart {
         this.created = created;
         this.digest = digest;
     }
-    
+
     public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
@@ -53,63 +53,63 @@ public class Chart {
 //        }
 //        return stringBuilder.toString();
 //    }
-    
+
     public String getVersion() {
         return version;
     }
-    
+
     public void setVersion(String version) {
         this.version = version;
     }
-    
+
     public String getDescription() {
         return description;
     }
-    
+
     public void setDescription(String description) {
         this.description = description;
     }
-    
+
     public String getApiVersion() {
         return apiVersion;
     }
-    
+
     public void setApiVersion(String apiVersion) {
         this.apiVersion = apiVersion;
     }
-    
+
     public String getAppVersion() {
         return appVersion;
     }
-    
+
     public void setAppVersion(String appVersion) {
         this.appVersion = appVersion;
     }
-    
+
     public List<String> getUrls() {
         return urls;
     }
-    
+
     public void setUrls(List<String> urls) {
         this.urls = urls;
     }
-    
+
     public Date getCreated() {
         return created;
     }
-    
+
     public void setCreated(Date created) {
         this.created = created;
     }
-    
+
     public String getDigest() {
         return digest;
     }
-    
+
     public void setDigest(String digest) {
         this.digest = digest;
     }
-    
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -117,12 +117,12 @@ public class Chart {
         Chart chart = (Chart) o;
         return Objects.equals(name, chart.name) && Objects.equals(version, chart.version) && Objects.equals(description, chart.description) && Objects.equals(apiVersion, chart.apiVersion) && Objects.equals(appVersion, chart.appVersion) && Objects.equals(urls, chart.urls) && Objects.equals(created, chart.created) && Objects.equals(digest, chart.digest);
     }
-    
+
     @Override
     public int hashCode() {
         return Objects.hash(name, version, description, apiVersion, appVersion, urls, created, digest);
     }
-    
+
     @Override
     public String toString() {
         return "Chart{" +

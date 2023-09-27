@@ -20,13 +20,13 @@ import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.Validati
 
 
 public class PackageRepositoryConfigurationProvider {
-    
+
     public PackageMaterialProperties repositoryConfiguration() {
         PackageMaterialProperties repositoryConfigurationResponse = new PackageMaterialProperties();
         repositoryConfigurationResponse.addPackageMaterialProperty(Constants.REPO_URL, url());
         return repositoryConfigurationResponse;
     }
-    
+
     public PackageMaterialProperties packageConfiguration() {
         PackageMaterialProperties packageConfigurationResponse = new PackageMaterialProperties();
         packageConfigurationResponse.addPackageMaterialProperty(Constants.PACKAGE_NAME, packageSpec());
@@ -34,7 +34,7 @@ public class PackageRepositoryConfigurationProvider {
         packageConfigurationResponse.addPackageMaterialProperty(Constants.POLL_VERSION_TO, pollVersionTo());
         return packageConfigurationResponse;
     }
-    
+
     public ValidationResultMessage validateRepositoryConfiguration(PackageMaterialProperties configurationProvidedByUser) {
         ValidationResultMessage validationResultMessage = new ValidationResultMessage();
         if (configurationProvidedByUser.getProperty(Constants.REPO_URL).value().isEmpty()) {
@@ -42,29 +42,29 @@ public class PackageRepositoryConfigurationProvider {
         }
         return validationResultMessage;
     }
-    
+
     public ValidationResultMessage validatePackageConfiguration(PackageMaterialProperties configurationProvidedByUser) {
         ValidationResultMessage validationResultMessage = new ValidationResultMessage();
         if (configurationProvidedByUser.getProperty(Constants.PACKAGE_NAME).value().isEmpty()) {
             validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Package name is null"));
         }
-        
+
         return validationResultMessage;
     }
-    
-    
+
+
     private PackageMaterialProperty url() {
         return new PackageMaterialProperty().withDisplayName("Repository URL").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
     }
-    
+
     private PackageMaterialProperty packageSpec() {
         return new PackageMaterialProperty().withDisplayName("Package Name").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
     }
-    
+
     private PackageMaterialProperty pollVersionFrom() {
         return new PackageMaterialProperty().withDisplayName("Poll Version From").withRequired(false).withPartOfIdentity(false).withDisplayOrder("1");
     }
-    
+
     private PackageMaterialProperty pollVersionTo() {
         return new PackageMaterialProperty().withDisplayName("Poll Version To").withRequired(false).withPartOfIdentity(false).withDisplayOrder("2");
     }
