@@ -29,7 +29,7 @@ class ChartmuseumClientTest {
         env.put("STORAGE", "LOCAL");
         env.put("STORAGE_LOCAL_ROOTDIR", "/charts");
         
-        chartMuseumContainer = new GenericContainer<>(CHARTMUSEUM_IMAGE).withExposedPorts(8080).withEnv(env).withFileSystemBind("src/main/test/resources/charts", "/charts", BindMode.READ_WRITE);
+        chartMuseumContainer = new GenericContainer<>(CHARTMUSEUM_IMAGE).withExposedPorts(8080).withEnv(env).withFileSystemBind("src/test/resources/charts", "/charts", BindMode.READ_WRITE);
         chartMuseumContainer.start();
         chartMuseumPort = chartMuseumContainer.getMappedPort(8080).toString();
     }

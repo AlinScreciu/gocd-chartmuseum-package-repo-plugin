@@ -38,18 +38,26 @@ public class PackageRepositoryConfigurationProvider {
 
     public ValidationResultMessage validateRepositoryConfiguration(PackageMaterialProperties configurationProvidedByUser) {
         ValidationResultMessage validationResultMessage = new ValidationResultMessage();
-        if (configurationProvidedByUser.getProperty(Constants.REPO_URL).value().isEmpty()) {
+        if (configurationProvidedByUser.getProperty(Constants.REPO_URL) == null) {
             validationResultMessage.addError(ValidationError.create(Constants.REPO_URL, "Repository URL is null"));
+            return validationResultMessage;
         }
+        if (configurationProvidedByUser.getProperty(Constants.REPO_URL).value().isBlank()) {
+            validationResultMessage.addError(ValidationError.create(Constants.REPO_URL, "Repository URL is blank"));
+        }
+
         return validationResultMessage;
     }
 
     public ValidationResultMessage validatePackageConfiguration(PackageMaterialProperties configurationProvidedByUser) {
         ValidationResultMessage validationResultMessage = new ValidationResultMessage();
-        if (configurationProvidedByUser.getProperty(Constants.PACKAGE_NAME).value().isEmpty()) {
+        if (configurationProvidedByUser.getProperty(Constants.PACKAGE_NAME) == null) {
             validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Package name is null"));
+            return  validationResultMessage;
         }
-
+        if (configurationProvidedByUser.getProperty(Constants.PACKAGE_NAME).value().isBlank()) {
+            validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Package name is blank"));
+        }
         return validationResultMessage;
     }
 
