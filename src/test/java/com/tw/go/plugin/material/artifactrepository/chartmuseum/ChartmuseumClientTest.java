@@ -5,7 +5,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.BindMode;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 
 import java.io.IOException;
@@ -85,4 +84,21 @@ class ChartmuseumClientTest {
         // Add assertions to verify the correctness of the returned latest revision
     }
 
+    @Test
+    void getLatestRevisionWithFromSetAndToSet() {
+        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("http://localhost:" + chartMuseumPort);
+        Chart latest = chartmuseumClient.getLatestRevision("guestbook", new ComparableVersion("1.1.2"), new ComparableVersion("1.1.4"));
+        assertNotNull(latest);
+        assertEquals("1.1.3-732987498", latest.getVersion());
+        // Add assertions to verify the correctness of the returned latest revision
+    }
+
+    @Test
+    void getLatestRevisionWithFromSet() {
+        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("http://localhost:" + chartMuseumPort);
+        Chart latest = chartmuseumClient.getLatestRevision("guestbook", new ComparableVersion("1.1.2"),null);
+        assertNotNull(latest);
+        assertEquals("2.6.40-1238agd-SNAPSHOT", latest.getVersion());
+        // Add assertions to verify the correctness of the returned latest revision
+    }
 }

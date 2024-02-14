@@ -50,15 +50,17 @@ public class ChartmuseumClient {
     }
 
     public List<Chart> getAllChartVersions(String chartName, ComparableVersion from, ComparableVersion to) throws IOException, InterruptedException {
+        HttpResponse<String> response;
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url + "/api/charts/" + chartName)).build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
         String body = response.body();
         List<Chart> charts = new ArrayList<>(gson.fromJson(body, new TypeToken<List<Chart>>() {
         }.getType()));
 
-            return filterFromTo(charts, from, to);
+        return filterFromTo(charts, from, to);
     }
 
     public Chart getLatestRevision(String chartName, ComparableVersion from, ComparableVersion to) {
@@ -79,13 +81,17 @@ public class ChartmuseumClient {
     private List<Chart> filterFromTo(List<Chart> charts, ComparableVersion from, ComparableVersion to) {
         return charts.stream().filter(chart -> {
             ComparableVersion version = new ComparableVersion(chart.getVersion());
-            if (from != null) {
-                return version.compareTo(from) >= 0;
+
+            if (from == null && to == null) {
+                return true;
             }
-            if (to != null) {
+            if (to != null && from == null) {
                 return version.compareTo(to) <= 0;
             }
-            return true;
+            if (to == null) {
+                return version.compareTo(from) >= 0;
+            }
+            return version.compareTo(from) >= 0 && version.compareTo(to) <= 0;
 
         }).collect(Collectors.toCollection(ArrayList::new));
     }
