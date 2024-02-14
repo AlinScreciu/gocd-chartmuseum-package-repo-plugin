@@ -42,6 +42,7 @@ public class PackageRepositoryPoller {
         try {
             chartmuseumClient.checkRepoConnection();
             LOGGER.info("Successfully connected to server: '" + url + "'");
+
             return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.SUCCESS, List.of("Successfully connected"));
         } catch (Exception e) {
             LOGGER.info(String.format("Failed connection to server: '%s'", url));
@@ -54,12 +55,21 @@ public class PackageRepositoryPoller {
         configurationProvider.validateRepositoryConfiguration(repositoryConfiguration);
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
         String chartName = packageConfiguration.getProperty(Constants.PACKAGE_NAME).value();
+        ComparableVersion fromVersion = null;
+        ComparableVersion toVersion = null;
+        if (!packageConfiguration.getProperty(Constants.FROM).value().isBlank()) {
+            fromVersion = new ComparableVersion(packageConfiguration.getProperty(Constants.FROM).value());
+        }
+        if (!packageConfiguration.getProperty(Constants.TO).value().isBlank()) {
+            toVersion = new ComparableVersion(packageConfiguration.getProperty(Constants.TO).value());
+        }
         LOGGER.info(String.format("Checking existence of chart: '%s' in chartmuseum: '%s'", chartName, url));
         ChartmuseumClient chartmuseumClient = new ChartmuseumClient(url);
         try {
             chartmuseumClient.checkChartConnection(chartName);
+            Chart latestRevision = chartmuseumClient.getLatestRevision(chartName, fromVersion, toVersion);
             LOGGER.info(String.format("Found chart: '%s' in chartmuseum: '%s'", chartName, url));
-            return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.SUCCESS, List.of("success message"));
+            return new CheckConnectionResultMessage(CheckConnectionResultMessage.STATUS.SUCCESS, List.of("Found chart: " + chartName + " with version: " + latestRevision.getVersion()));
 
         } catch (Exception e) {
             LOGGER.info(String.format("Failed to find chart: '%s' in chartmuseum: '%s'", chartName, url));
@@ -72,9 +82,17 @@ public class PackageRepositoryPoller {
         configurationProvider.validateRepositoryConfiguration(repositoryConfiguration);
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
         String chart = packageConfiguration.getProperty(Constants.PACKAGE_NAME).value();
+        ComparableVersion fromVersion = null;
+        ComparableVersion toVersion = null;
+        if (!packageConfiguration.getProperty(Constants.FROM).value().isBlank()) {
+            fromVersion = new ComparableVersion(packageConfiguration.getProperty(Constants.FROM).value());
+        }
+        if (!packageConfiguration.getProperty(Constants.TO).value().isBlank()) {
+            toVersion = new ComparableVersion(packageConfiguration.getProperty(Constants.TO).value());
+        }
         ChartmuseumClient chartmuseumClient = new ChartmuseumClient(url);
         LOGGER.info(String.format("Getting latest revision of chart: '%s' in chartmuseum: '%s'", chart, url));
-        Chart latestRevision = chartmuseumClient.getLatestRevision(chart);
+        Chart latestRevision = chartmuseumClient.getLatestRevision(chart, fromVersion, toVersion);
         if (latestRevision == null) {
             LOGGER.info(String.format("Didn't find chart: '%s' in chartmuseum: '%s'", chart, url));
             return null;
@@ -89,9 +107,17 @@ public class PackageRepositoryPoller {
         configurationProvider.validateRepositoryConfiguration(repositoryConfiguration);
         String url = repositoryConfiguration.getProperty(Constants.REPO_URL).value();
         String chart = packageConfiguration.getProperty(Constants.PACKAGE_NAME).value();
+        ComparableVersion fromVersion = null;
+        ComparableVersion toVersion = null;
+        if (!packageConfiguration.getProperty(Constants.FROM).value().isBlank()) {
+            fromVersion = new ComparableVersion(packageConfiguration.getProperty(Constants.FROM).value());
+        }
+        if (!packageConfiguration.getProperty(Constants.TO).value().isBlank()) {
+            toVersion = new ComparableVersion(packageConfiguration.getProperty(Constants.TO).value());
+        }
         ChartmuseumClient chartmuseumClient = new ChartmuseumClient(url);
         LOGGER.info(String.format("Getting latest revision of chart: '%s' since: '%s' in chartmuseum: '%s'", chart, previousPackageRevision.getRevision(), url));
-        Chart latestRevision = chartmuseumClient.getLatestRevision(chart);
+        Chart latestRevision = chartmuseumClient.getLatestRevision(chart, fromVersion, toVersion);
         String previousRevision = previousPackageRevision.getRevision();
         int compare = new ComparableVersion(latestRevision.getVersion()).compareTo(new ComparableVersion(previousRevision));
         if (compare > 0) {

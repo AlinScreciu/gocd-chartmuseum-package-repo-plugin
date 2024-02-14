@@ -18,4 +18,6 @@ package com.tw.go.plugin.material.artifactrepository.chartmuseum;
 public class Constants {
     public static final String REPO_URL = "REPO_URL";
     public static final String PACKAGE_NAME = "PACKAGE_NAME";
+    public static final String FROM = "FROM";
+    public static final String TO = "TO";
 }
