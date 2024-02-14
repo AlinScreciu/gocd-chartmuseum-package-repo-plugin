@@ -20,6 +20,7 @@ import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.PackageM
 import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.PackageMaterialProperty;
 import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.ValidationError;
 import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.ValidationResultMessage;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 
 
 public class PackageRepositoryConfigurationProvider {
@@ -33,8 +34,12 @@ public class PackageRepositoryConfigurationProvider {
     public PackageMaterialProperties packageConfiguration() {
         PackageMaterialProperties packageConfigurationResponse = new PackageMaterialProperties();
         packageConfigurationResponse.addPackageMaterialProperty(Constants.PACKAGE_NAME, packageSpec());
+        packageConfigurationResponse.addPackageMaterialProperty(Constants.FROM, from());
+        packageConfigurationResponse.addPackageMaterialProperty(Constants.TO, to());
+
         return packageConfigurationResponse;
     }
+
 
     public ValidationResultMessage validateRepositoryConfiguration(PackageMaterialProperties configurationProvidedByUser) {
         ValidationResultMessage validationResultMessage = new ValidationResultMessage();
@@ -58,6 +63,16 @@ public class PackageRepositoryConfigurationProvider {
         if (configurationProvidedByUser.getProperty(Constants.PACKAGE_NAME).value().isBlank()) {
             validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Package name is blank"));
         }
+        ComparableVersion to = null, from = null;
+        if (!configurationProvidedByUser.getProperty(Constants.TO).value().isBlank()) {
+            to = new ComparableVersion(configurationProvidedByUser.getProperty(Constants.TO).value());
+        }
+        if (!configurationProvidedByUser.getProperty(Constants.FROM).value().isBlank()) {
+            from = new ComparableVersion(configurationProvidedByUser.getProperty(Constants.FROM).value());
+        }
+        if (to != null && from != null && to.compareTo(from) < 0) {
+            validationResultMessage.addError(ValidationError.create(Constants.FROM, "From version should be less than or equal to To version"));
+        }
         return validationResultMessage;
     }
 
@@ -67,6 +82,13 @@ public class PackageRepositoryConfigurationProvider {
     }
 
     private PackageMaterialProperty packageSpec() {
-        return new PackageMaterialProperty().withDisplayName("Package Spec").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
+        return new PackageMaterialProperty().withDisplayName("Chart name").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
+    }
+    private PackageMaterialProperty from() {
+        return new PackageMaterialProperty().withDisplayName("Version to poll >=").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
+    }
+
+    private PackageMaterialProperty to() {
+        return new PackageMaterialProperty().withDisplayName("Version to poll <").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
     }
 }
