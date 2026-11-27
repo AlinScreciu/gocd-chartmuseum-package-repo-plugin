@@ -15,19 +15,59 @@
  *************************GO-LICENSE-END***********************************/
 package com.tw.go.plugin.material.artifactrepository.chartmuseum;
 
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
+import com.google.gson.stream.JsonWriter;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.Date;
 
 public class JsonUtil {
 
+    // GoCD's package plugin API wants yyyy-MM-dd'T'HH:mm:ss.SSS'Z'. GoCD 26.1+ reads the 'Z' as UTC,
+    // so timestamps are written in UTC rather than in the server's local time zone.
+    private static final DateTimeFormatter GOCD_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
+
+    private static final Gson GSON = new GsonBuilder()
+            .registerTypeAdapter(Date.class, new TypeAdapter<Date>() {
+                @Override
+                public void write(JsonWriter out, Date value) throws IOException {
+                    if (value == null) {
+                        out.nullValue();
+                    } else {
+                        out.value(GOCD_TIMESTAMP.format(value.toInstant()));
+                    }
+                }
+
+                @Override
+                public Date read(JsonReader in) throws IOException {
+                    if (in.peek() == JsonToken.NULL) {
+                        in.nextNull();
+                        return null;
+                    }
+                    String text = in.nextString();
+                    try {
+                        return Date.from(Instant.from(GOCD_TIMESTAMP.parse(text)));
+                    } catch (DateTimeParseException e) {
+                        // Only the previous revision's timestamp is read, and the plugin never uses it.
+                        return null;
+                    }
+                }
+            })
+            .create();
+
     public static String toJsonString(Object object) {
-        GsonBuilder gsonBuilder = new GsonBuilder();
-        gsonBuilder.setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        return gsonBuilder.create().toJson(object);
+        return GSON.toJson(object);
     }
 
     public static <T> T fromJsonString(String json, Class<T> type) {
-        GsonBuilder gsonBuilder = new GsonBuilder();
-        gsonBuilder.setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        return gsonBuilder.create().fromJson(json, type);
+        return GSON.fromJson(json, type);
     }
 }
