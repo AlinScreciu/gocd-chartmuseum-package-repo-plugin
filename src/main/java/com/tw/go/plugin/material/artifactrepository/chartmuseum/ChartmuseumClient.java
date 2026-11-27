@@ -1,7 +1,7 @@
 package com.tw.go.plugin.material.artifactrepository.chartmuseum;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
@@ -10,89 +10,125 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Talks to the ChartMuseum HTTP API. Every failure (unreachable server, non-2xx status,
+ * unparseable body) is thrown as an IOException so GoCD reports it as a failed material check.
+ */
 public class ChartmuseumClient {
-    private final String url;
-    Gson gson;
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(60);
 
+    private final String baseUrl;
+    private final HttpClient httpClient;
+    private final Gson gson = new Gson();
 
     public ChartmuseumClient(String url) {
-        this.url = url;
-        gson = new GsonBuilder().create();
+        this.baseUrl = stripTrailingSlashes(url);
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(CONNECT_TIMEOUT)
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
     }
 
-    public void checkRepoConnection() {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url + "/health")).build();
-        throwIfStatusNotOk(client, request);
+    public String getBaseUrl() {
+        return baseUrl;
     }
 
-    private void throwIfStatusNotOk(HttpClient client, HttpRequest request) {
+    public void checkRepoConnection() throws IOException {
+        get("/health");
+    }
+
+    /** All versions of the chart that fall inside the range. Throws if the chart does not exist. */
+    public List<Chart> getAllChartVersions(String chartName, VersionRange range) throws IOException {
+        HttpResponse<String> response = send("/api/charts/" + chartName);
+        if (response.statusCode() == 404) {
+            throw new IOException(String.format("Chart '%s' not found in ChartMuseum at %s", chartName, baseUrl));
+        }
+        requireSuccess(response);
+        List<Chart> charts;
         try {
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new RuntimeException(response.toString());
-            }
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            charts = gson.fromJson(response.body(), new TypeToken<List<Chart>>() {
+            }.getType());
+        } catch (JsonParseException e) {
+            throw new IOException("Unexpected response from " + response.uri() + ": " + e.getMessage(), e);
+        }
+        if (charts == null) {
+            return new ArrayList<>();
+        }
+        return charts.stream()
+                .filter(chart -> chart.getVersion() != null && range.contains(chart.getVersion()))
+                .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    /** The newest version inside the range, or empty if the chart exists but no version matches. */
+    public Optional<Chart> getLatestRevision(String chartName, VersionRange range) throws IOException {
+        return getAllChartVersions(chartName, range).stream()
+                .max(Comparator.comparing(chart -> new ComparableVersion(chart.getVersion())));
+    }
+
+    /** Download URL of the chart archive, as ChartMuseum lists it in "urls". */
+    public String downloadUrl(Chart chart) {
+        List<String> urls = chart.getUrls();
+        if (urls == null || urls.isEmpty() || urls.get(0).isBlank()) {
+            return baseUrl + "/charts/" + chart.getName() + "-" + chart.getVersion() + ".tgz";
+        }
+        String first = urls.get(0);
+        if (first.startsWith("http://") || first.startsWith("https://")) {
+            // ChartMuseum was started with --chart-url
+            return first;
+        }
+        return baseUrl + "/" + first.replaceFirst("^/+", "");
+    }
+
+    /** API page describing one chart version; GoCD links to it from the material revision. */
+    public String chartVersionUrl(Chart chart) {
+        return baseUrl + "/api/charts/" + chart.getName() + "/" + chart.getVersion();
+    }
+
+    private void get(String path) throws IOException {
+        requireSuccess(send(path));
+    }
+
+    private HttpResponse<String> send(String path) throws IOException {
+        HttpRequest request;
+        try {
+            request = HttpRequest.newBuilder(URI.create(baseUrl + path))
+                    .timeout(REQUEST_TIMEOUT)
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Invalid ChartMuseum URL '" + baseUrl + "': " + e.getMessage(), e);
+        }
+        try {
+            return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while calling " + request.uri(), e);
+        } catch (IOException e) {
+            throw new IOException("Could not reach " + request.uri() + ": " + e, e);
         }
     }
 
-    public void checkChartConnection(String chartName) {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url + "/api/charts/" + chartName)).method("HEAD", HttpRequest.BodyPublishers.noBody()).build();
-        throwIfStatusNotOk(client, request);
-    }
-
-    public List<Chart> getAllChartVersions(String chartName, ComparableVersion from, ComparableVersion to) throws IOException, InterruptedException {
-        HttpResponse<String> response;
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url + "/api/charts/" + chartName)).build();
-        response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        String body = response.body();
-        List<Chart> charts = new ArrayList<>(gson.fromJson(body, new TypeToken<List<Chart>>() {
-        }.getType()));
-
-        return filterFromTo(charts, from, to);
-    }
-
-    public Chart getLatestRevision(String chartName, ComparableVersion from, ComparableVersion to) {
-        try {
-            List<Chart> charts = getAllChartVersions(chartName, from, to);
-
-            charts.sort((l, r) -> {
-                ComparableVersion comparableVersionL = new ComparableVersion(l.getVersion());
-                ComparableVersion comparableVersionR = new ComparableVersion(r.getVersion());
-                return comparableVersionR.compareTo(comparableVersionL);
-            });
-            return charts.get(0);
-        } catch (IOException | InterruptedException e) {
-            return null;
+    private static void requireSuccess(HttpResponse<String> response) throws IOException {
+        int status = response.statusCode();
+        if (status < 200 || status >= 300) {
+            throw new IOException("ChartMuseum returned HTTP " + status + " for " + response.uri());
         }
     }
 
-    private List<Chart> filterFromTo(List<Chart> charts, ComparableVersion from, ComparableVersion to) {
-        return charts.stream().filter(chart -> {
-            ComparableVersion version = new ComparableVersion(chart.getVersion());
-
-            if (from == null && to == null) {
-                return true;
-            }
-            if (to != null && from == null) {
-                return version.compareTo(to) <= 0;
-            }
-            if (to == null) {
-                return version.compareTo(from) >= 0;
-            }
-            return version.compareTo(from) >= 0 && version.compareTo(to) <= 0;
-
-        }).collect(Collectors.toCollection(ArrayList::new));
+    private static String stripTrailingSlashes(String url) {
+        String trimmed = url == null ? "" : url.trim();
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 }

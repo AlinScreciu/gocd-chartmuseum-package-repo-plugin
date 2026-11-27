@@ -20,10 +20,17 @@ import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.PackageM
 import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.PackageMaterialProperty;
 import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.ValidationError;
 import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.ValidationResultMessage;
-import org.apache.maven.artifact.versioning.ComparableVersion;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.regex.Pattern;
 
 
 public class PackageRepositoryConfigurationProvider {
+
+    // Helm chart names are letters, digits, '-', '_' and '.'. Anything else (a '/', say)
+    // would change which ChartMuseum endpoint the plugin calls.
+    private static final Pattern CHART_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
     public PackageMaterialProperties repositoryConfiguration() {
         PackageMaterialProperties repositoryConfigurationResponse = new PackageMaterialProperties();
@@ -40,42 +47,55 @@ public class PackageRepositoryConfigurationProvider {
         return packageConfigurationResponse;
     }
 
+    /** The trimmed value of a property, or "" when the property is missing (e.g. a package saved by plugin 1.1). */
+    public static String value(PackageMaterialProperties configuration, String key) {
+        if (configuration == null) {
+            return "";
+        }
+        PackageMaterialProperty property = configuration.getProperty(key);
+        if (property == null || property.value() == null) {
+            return "";
+        }
+        return property.value().trim();
+    }
 
     public ValidationResultMessage validateRepositoryConfiguration(PackageMaterialProperties configurationProvidedByUser) {
         ValidationResultMessage validationResultMessage = new ValidationResultMessage();
-        if (configurationProvidedByUser.getProperty(Constants.REPO_URL) == null) {
-            validationResultMessage.addError(ValidationError.create(Constants.REPO_URL, "Repository URL is null"));
+        String url = value(configurationProvidedByUser, Constants.REPO_URL);
+        if (url.isEmpty()) {
+            validationResultMessage.addError(ValidationError.create(Constants.REPO_URL, "Repository URL is required"));
             return validationResultMessage;
         }
-        if (configurationProvidedByUser.getProperty(Constants.REPO_URL).value().isBlank()) {
-            validationResultMessage.addError(ValidationError.create(Constants.REPO_URL, "Repository URL is blank"));
+        try {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            if (!("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) || uri.getHost() == null) {
+                validationResultMessage.addError(ValidationError.create(Constants.REPO_URL, "Repository URL must be an http:// or https:// URL, e.g. http://chartmuseum:8080"));
+            }
+        } catch (URISyntaxException e) {
+            validationResultMessage.addError(ValidationError.create(Constants.REPO_URL, "Repository URL is not a valid URL: " + e.getMessage()));
         }
-
         return validationResultMessage;
     }
 
     public ValidationResultMessage validatePackageConfiguration(PackageMaterialProperties configurationProvidedByUser) {
         ValidationResultMessage validationResultMessage = new ValidationResultMessage();
-        if (configurationProvidedByUser.getProperty(Constants.PACKAGE_NAME) == null) {
-            validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Package name is null"));
-            return  validationResultMessage;
+        String chartName = value(configurationProvidedByUser, Constants.PACKAGE_NAME);
+        if (chartName.isEmpty()) {
+            validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Chart name is required"));
+        } else if (!CHART_NAME.matcher(chartName).matches()) {
+            validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Chart name may only contain letters, digits, '.', '_' and '-'"));
         }
-        if (configurationProvidedByUser.getProperty(Constants.PACKAGE_NAME).value().isBlank()) {
-            validationResultMessage.addError(ValidationError.create(Constants.PACKAGE_NAME, "Package name is blank"));
-        }
-        ComparableVersion to = null, from = null;
-        if (!configurationProvidedByUser.getProperty(Constants.TO).value().isBlank()) {
-            to = new ComparableVersion(configurationProvidedByUser.getProperty(Constants.TO).value());
-        }
-        if (!configurationProvidedByUser.getProperty(Constants.FROM).value().isBlank()) {
-            from = new ComparableVersion(configurationProvidedByUser.getProperty(Constants.FROM).value());
-        }
-        if (to != null && from != null && to.compareTo(from) < 0) {
-            validationResultMessage.addError(ValidationError.create(Constants.FROM, "From version should be less than or equal to To version"));
+        VersionRange range = versionRange(configurationProvidedByUser);
+        if (!range.isSatisfiable()) {
+            validationResultMessage.addError(ValidationError.create(Constants.TO, "Version to must be greater than Version from"));
         }
         return validationResultMessage;
     }
 
+    public VersionRange versionRange(PackageMaterialProperties packageConfiguration) {
+        return VersionRange.parse(value(packageConfiguration, Constants.FROM), value(packageConfiguration, Constants.TO));
+    }
 
     private PackageMaterialProperty url() {
         return new PackageMaterialProperty().withDisplayName("Repository URL").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
@@ -84,11 +104,14 @@ public class PackageRepositoryConfigurationProvider {
     private PackageMaterialProperty packageSpec() {
         return new PackageMaterialProperty().withDisplayName("Chart name").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
     }
+
+    // FROM and TO keep partOfIdentity=true: changing them would change the fingerprint of
+    // every package material configured with plugin 1.2.
     private PackageMaterialProperty from() {
-        return new PackageMaterialProperty().withDisplayName("Version to poll >=").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
+        return new PackageMaterialProperty().withDisplayName("Version from (>=, optional)").withRequired(false).withPartOfIdentity(true).withDisplayOrder("1");
     }
 
     private PackageMaterialProperty to() {
-        return new PackageMaterialProperty().withDisplayName("Version to poll <").withRequired(true).withPartOfIdentity(true).withDisplayOrder("0");
+        return new PackageMaterialProperty().withDisplayName("Version to (<, optional)").withRequired(false).withPartOfIdentity(true).withDisplayOrder("2");
     }
 }

@@ -23,7 +23,6 @@ import com.thoughtworks.go.plugin.api.request.GoPluginApiRequest;
 import com.thoughtworks.go.plugin.api.response.DefaultGoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.tw.go.plugin.material.artifactrepository.chartmuseum.message.*;
-import com.tw.go.plugin.material.artifactrepository.chartmuseum.*;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -74,7 +73,9 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             }
             return DefaultGoPluginApiResponse.badRequest(String.format("Invalid request name %s", goPluginApiRequest.requestName()));
         } catch (Throwable e) {
-            return DefaultGoPluginApiResponse.error(e.getMessage());
+            LOGGER.error(String.format("Request '%s' failed: %s", goPluginApiRequest.requestName(), e.getMessage()), e);
+            // GoCD shows this text as the material error, so never send a bare "null".
+            return DefaultGoPluginApiResponse.error(e.getMessage() == null ? e.toString() : e.getMessage());
         }
     }
     
@@ -136,12 +137,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
             @Override
             public GoPluginApiResponse handle(GoPluginApiRequest request) {
                 RepositoryConnectionMessage message = fromJsonString(request.requestBody(), RepositoryConnectionMessage.class);
-                CheckConnectionResultMessage result = null;
-                try {
-                    result = packageRepositoryPoller.checkConnectionToRepository(message.getRepositoryConfiguration());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                CheckConnectionResultMessage result = packageRepositoryPoller.checkConnectionToRepository(message.getRepositoryConfiguration());
                 return success(toJsonString(result));
             }
         };
@@ -161,7 +157,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
     MessageHandler latestRevisionMessageHandler() {
         return new MessageHandler() {
             @Override
-            public GoPluginApiResponse handle(GoPluginApiRequest request) {
+            public GoPluginApiResponse handle(GoPluginApiRequest request) throws IOException {
                 LatestPackageRevisionMessage message = fromJsonString(request.requestBody(), LatestPackageRevisionMessage.class);
                 PackageRevisionMessage revision = packageRepositoryPoller.getLatestRevision(message.getPackageConfiguration(), message.getRepositoryConfiguration());
                 return success(toJsonString(revision));
@@ -172,7 +168,7 @@ public class PackageRepositoryMaterial extends AbstractGoPlugin {
     MessageHandler latestRevisionSinceMessageHandler() {
         return new MessageHandler() {
             @Override
-            public GoPluginApiResponse handle(GoPluginApiRequest request) {
+            public GoPluginApiResponse handle(GoPluginApiRequest request) throws IOException {
                 LatestPackageRevisionSinceMessage message = fromJsonString(request.requestBody(), LatestPackageRevisionSinceMessage.class);
                 PackageRevisionMessage revision = packageRepositoryPoller.getLatestRevisionSince(message.getPackageConfiguration(), message.getRepositoryConfiguration(), message.getPreviousRevision());
                 return success(revision == null ? null : toJsonString(revision));

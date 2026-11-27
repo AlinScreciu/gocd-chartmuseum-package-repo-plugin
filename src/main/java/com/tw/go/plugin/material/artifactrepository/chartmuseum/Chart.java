@@ -33,23 +33,6 @@ public class Chart {
         return name;
     }
 
-    public String getSemver() {
-        String left = version.split("-")[0];
-        StringBuilder stringBuilder = new StringBuilder();
-        int dots = 0;
-        for (int i = 0; i < left.length(); i++) {
-            char currentChar = left.charAt(i);
-            stringBuilder.append(currentChar);
-            if (dots == 2) {
-                break;
-            }
-            if (currentChar == '.') {
-                dots += 1;
-            }
-        }
-        return stringBuilder.toString();
-    }
-
     public void setName(String name) {
         this.name = name;
     }

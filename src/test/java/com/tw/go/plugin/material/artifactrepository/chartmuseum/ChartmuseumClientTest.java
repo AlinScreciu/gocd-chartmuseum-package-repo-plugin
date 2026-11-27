@@ -1,104 +1,96 @@
 package com.tw.go.plugin.material.artifactrepository.chartmuseum;
 
-import org.apache.maven.artifact.versioning.ComparableVersion;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.BindMode;
-import org.testcontainers.containers.GenericContainer;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static com.tw.go.plugin.material.artifactrepository.chartmuseum.ChartMuseumFixture.CHART;
+import static com.tw.go.plugin.material.artifactrepository.chartmuseum.ChartMuseumFixture.NEWEST;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChartmuseumClientTest {
-    static private final String CHARTMUSEUM_IMAGE = "ghcr.io/helm/chartmuseum:v0.14.0";
-    static GenericContainer<?> chartMuseumContainer;
-    static private String chartMuseumPort;
 
-    @BeforeAll
-    static void setupChartmuseumContainer() {
+    private final ChartmuseumClient client = new ChartmuseumClient(ChartMuseumFixture.url());
 
-        Map<String, String> env = new HashMap<>();
-        env.put("DEBUG", "1");
-        env.put("STORAGE", "LOCAL");
-        env.put("STORAGE_LOCAL_ROOTDIR", "/charts");
-
-        chartMuseumContainer = new GenericContainer<>(CHARTMUSEUM_IMAGE).withExposedPorts(8080).withEnv(env)
-                .withFileSystemBind("src/test/resources/charts", "/charts", BindMode.READ_WRITE);
-        chartMuseumContainer.start();
-        chartMuseumPort = chartMuseumContainer.getMappedPort(8080).toString();
-    }
-
-    @AfterAll
-    static void cleanup() {
-        if (!chartMuseumContainer.isRunning()) {
-            return;
-        }
-        System.out.println(chartMuseumContainer.getLogs());
-
-        chartMuseumContainer.stop();
+    @Test
+    void validUrlConnectionShouldWork() throws IOException {
+        client.checkRepoConnection();
     }
 
     @Test
-    void validUrlConnectionShouldWork() {
-        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("http://localhost:" + chartMuseumPort);
-        chartmuseumClient.checkRepoConnection();
+    void trailingSlashInUrlIsIgnored() throws IOException {
+        ChartmuseumClient withSlash = new ChartmuseumClient(ChartMuseumFixture.url() + "/");
+        withSlash.checkRepoConnection();
+        assertEquals(NEWEST, withSlash.getLatestRevision(CHART, VersionRange.ALL).orElseThrow().getVersion());
     }
 
     @Test
-    void invalidUrlConnectionShouldFail() {
-        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("localhost:7070");
-        try {
-            chartmuseumClient.checkRepoConnection();
-            fail();
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("invalid"));
-        }
+    void urlWithoutSchemeFails() {
+        IOException e = assertThrows(IOException.class, () -> new ChartmuseumClient("localhost:7070").checkRepoConnection());
+        assertTrue(e.getMessage().contains("localhost:7070"), e.getMessage());
     }
 
     @Test
-    void getLatestRevision() throws IOException, InterruptedException {
-        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("http://localhost:" + chartMuseumPort);
-        List<Chart> charts = chartmuseumClient.getAllChartVersions("guestbook", null, null);
-        Chart latest = chartmuseumClient.getLatestRevision("guestbook", null, null);
-        charts.sort((l, r) -> {
-            ComparableVersion comparableVersionL = new ComparableVersion(l.getAppVersion());
-            ComparableVersion comparableVersionR = new ComparableVersion(r.getAppVersion());
-            return comparableVersionR.compareTo(comparableVersionL);
-        });
-        String expected = charts.get(0).getAppVersion();
-        assertEquals(expected, latest.getAppVersion());
+    void unreachableServerFails() {
+        IOException e = assertThrows(IOException.class, () -> new ChartmuseumClient("http://127.0.0.1:1").checkRepoConnection());
+        assertTrue(e.getMessage().startsWith("Could not reach"), e.getMessage());
     }
 
+    @Test
+    void latestRevisionIsTheHighestChartVersion() throws IOException {
+        assertEquals(NEWEST, client.getLatestRevision(CHART, VersionRange.ALL).orElseThrow().getVersion());
+    }
 
     @Test
-    void getLatestRevisionWithToSet() {
-        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("http://localhost:" + chartMuseumPort);
-        Chart latest = chartmuseumClient.getLatestRevision("guestbook", null, new ComparableVersion("1.1.2"));
-        assertNotNull(latest);
+    void latestRevisionWithToSet() throws IOException {
+        Chart latest = client.getLatestRevision(CHART, VersionRange.parse(null, "1.1.2")).orElseThrow();
         assertEquals("1.1.1-930314778", latest.getVersion());
-        // Add assertions to verify the correctness of the returned latest revision
     }
 
     @Test
-    void getLatestRevisionWithFromSetAndToSet() {
-        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("http://localhost:" + chartMuseumPort);
-        Chart latest = chartmuseumClient.getLatestRevision("guestbook", new ComparableVersion("1.1.2"), new ComparableVersion("1.1.4"));
-        assertNotNull(latest);
+    void latestRevisionWithFromAndToSet() throws IOException {
+        Chart latest = client.getLatestRevision(CHART, VersionRange.parse("1.1.2", "1.1.4")).orElseThrow();
         assertEquals("1.1.3-732987498", latest.getVersion());
-        // Add assertions to verify the correctness of the returned latest revision
     }
 
     @Test
-    void getLatestRevisionWithFromSet() {
-        ChartmuseumClient chartmuseumClient = new ChartmuseumClient("http://localhost:" + chartMuseumPort);
-        Chart latest = chartmuseumClient.getLatestRevision("guestbook", new ComparableVersion("1.1.2"),null);
-        assertNotNull(latest);
-        assertEquals("2.6.40-1238agd-SNAPSHOT", latest.getVersion());
-        // Add assertions to verify the correctness of the returned latest revision
+    void latestRevisionWithFromSet() throws IOException {
+        Chart latest = client.getLatestRevision(CHART, VersionRange.parse("1.1.2", null)).orElseThrow();
+        assertEquals(NEWEST, latest.getVersion());
+    }
+
+    @Test
+    void rangeWithNoMatchingVersionIsEmpty() throws IOException {
+        Optional<Chart> latest = client.getLatestRevision(CHART, VersionRange.parse("100.0.0", null));
+        assertTrue(latest.isEmpty());
+    }
+
+    @Test
+    void allVersionsAreFilteredByRange() throws IOException {
+        List<Chart> charts = client.getAllChartVersions(CHART, VersionRange.parse("1.1.2", "1.1.4"));
+        assertEquals(List.of("1.1.2-240098175", "1.1.2-396927370", "1.1.2-977658686", "1.1.3-374670652", "1.1.3-732987498"),
+                charts.stream().map(Chart::getVersion).sorted().collect(java.util.stream.Collectors.toList()));
+    }
+
+    @Test
+    void unknownChartFailsWithNotFound() {
+        IOException e = assertThrows(IOException.class, () -> client.getLatestRevision("no-such-chart", VersionRange.ALL));
+        assertTrue(e.getMessage().contains("not found"), e.getMessage());
+    }
+
+    @Test
+    void downloadUrlResolvesRelativeUrlsAgainstTheServer() throws IOException {
+        Chart chart = client.getLatestRevision(CHART, VersionRange.ALL).orElseThrow();
+        assertEquals(ChartMuseumFixture.url() + "/charts/guestbook-" + NEWEST + ".tgz", client.downloadUrl(chart));
+    }
+
+    @Test
+    void downloadUrlKeepsAbsoluteUrls() {
+        Chart chart = new Chart("app", "1.0.0", null, null, null, List.of("https://charts.example.com/app-1.0.0.tgz"), null, null);
+        assertEquals("https://charts.example.com/app-1.0.0.tgz", client.downloadUrl(chart));
     }
 }

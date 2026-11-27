@@ -1,4 +1,6 @@
-# This release process looks for tags and produces releases.
+# Push a tag gocd-chartmuseum-package-repo-plugin-<version> (matching <version> in pom.xml)
+# to run the full test matrix and publish a GitHub release with the jar and its checksums.
+# The release notes are the "## <version>" section of CHANGELOG.md.
 name: Release
 
 on:
@@ -6,68 +8,57 @@ on:
     tags:
       - 'gocd-chartmuseum-package-repo-plugin-[0-9]+*'
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  test:
+    uses: ./.github/workflows/maven.yml
+
+  release:
+    needs: test
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      md5sum: ${{ steps.md5sum.outputs.md5sum }}
-      sha256sum: ${{ steps.sha256sum.outputs.sha256sum }}
-    env:
-      DEBIAN_FRONTEND: noninteractive
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
       with:
-        distribution: 'adopt'
-        java-version: 17
-    - name: Build with Maven
-      run: mvn -B package --file pom.xml
-    - name: Extract current maven version
-      run: echo "::set-output name=version::$(mvn org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate -Dexpression=project.version -q -DforceStdout)"
+        distribution: temurin
+        java-version: 21
+        cache: maven
+    - name: Check the tag matches the pom version
       id: version
-      shell: bash
-    - name: Calculate MD5
-      run: echo "::set-output name=md5sum::$(md5sum -b target/chartmuseum.material.poller.jar | cut -f1 -d" ")"
-      id: md5sum
-      shell: bash
-    - name: Calculate SHA256
-      run: echo "::set-output name=sha256sum::$(sha256sum -b target/chartmuseum.material.poller.jar | cut -f1 -d" ")"
-      id: sha256sum
-      shell: bash
-    - uses: actions/upload-artifact@v3
-      with:
-        name: chartmuseum.material.poller.jar
-        path: target/chartmuseum.material.poller.jar
-    - uses: actions/create-release@v1
-      id: create_release
+      run: |
+        version=$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)
+        tag_version="${GITHUB_REF_NAME#gocd-chartmuseum-package-repo-plugin-}"
+        if [ "$version" != "$tag_version" ]; then
+          echo "Tag says $tag_version but pom.xml says $version" >&2
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: Build
+      run: mvn -B -DskipTests package
+    - name: Write release notes
       env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: ${{ github.ref }}
-        draft: true
-        body: |
-          # Release ${{ steps.version.outputs.version }}
-          ## Changes
-          
-          * 1
-          * 2
-          * 3
-
-          ## Checksums
-          |Type|Message digest|
-          |----|--------------|
-          |MD5|`${{ steps.md5sum.outputs.md5sum }}`|
-          |SHA256|`${{ steps.sha256sum.outputs.sha256sum }}`|
-
-    - uses: actions/upload-release-asset@v1
+        VERSION: ${{ steps.version.outputs.version }}
+      run: |
+        awk -v v="$VERSION" '$0 ~ "^## " { if (found) exit; if ($2 == v) { found = 1; next } } found' CHANGELOG.md > notes.md
+        if [ ! -s notes.md ]; then
+          echo "CHANGELOG.md has no section '## $VERSION'" >&2
+          exit 1
+        fi
+        {
+          echo
+          echo "## Checksums"
+          echo
+          echo "| Type | Digest |"
+          echo "|------|--------|"
+          echo "| SHA256 | \`$(sha256sum target/chartmuseum.material.poller.jar | cut -d' ' -f1)\` |"
+          echo "| MD5 | \`$(md5sum target/chartmuseum.material.poller.jar | cut -d' ' -f1)\` |"
+        } >> notes.md
+    - name: Publish
       env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: target/chartmuseum.material.poller.jar
-        asset_name: chartmuseum.material.poller.jar
-        asset_content_type: application/java-archive
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "$GITHUB_REF_NAME" target/chartmuseum.material.poller.jar \
+          --title "${{ steps.version.outputs.version }}" \
+          --notes-file notes.md
